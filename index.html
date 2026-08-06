@@ -485,9 +485,9 @@ function pullsForSpecificFes(opt,target){
 }
 
 /* ============ 画面 ============ */
-/* 公開URL。ここを空にしておくと、公開先で開いたときのURLがコピー文に自動で入る。
-   短縮URLなどを使いたいときだけ、ここに直接書く */
-const SITE_URL='';
+/* 公開URL。コピー文の末尾に入る。
+   空にすると、公開先で開いたときのURLを自動で使う（未公開の確認用） */
+const SITE_URL='https://natade-v.github.io/ba-gacha-luck/';
 const $=id=>document.getElementById(id);
 const fx=(v,n=2)=>Number(v).toFixed(n);
 /* v===0 は「小さい」ではなく「起こらない」なので、0.0001%未満とは書かない */
