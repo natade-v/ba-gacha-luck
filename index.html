@@ -67,6 +67,12 @@ h3{font-size:14px;font-weight:800;margin:0 0 8px;color:var(--halo-deep)}
 
 /* ---- フォーム ---- */
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+/* ラベルが2行になった欄だけ入力が1行ぶん下がるのを防ぐ。列の高さは揃うので、
+   入力を下端に寄せておけば横一線に並ぶ */
+.grid>div{display:flex;flex-direction:column;justify-content:flex-end}
+/* 3項目のときは auto-fit が余った列を作って左に寄るので、均等3列で敷き直す */
+.grid.trio{grid-template-columns:repeat(3,1fr)}
+@media (max-width:560px){.grid.trio{grid-template-columns:1fr}}
 label{display:block;font-size:11.5px;font-weight:700;color:var(--slate);letter-spacing:.04em;margin-bottom:4px}
 select{
   width:100%;font-family:var(--jp);font-size:14px;font-weight:600;color:var(--void);
@@ -100,19 +106,12 @@ button:hover{filter:brightness(1.08)}
 #preset-state{font-size:11.5px;color:var(--slate);font-weight:700}
 .run{width:100%;padding:13px;font-size:15px;letter-spacing:.05em;margin-top:16px}
 
-/* ---- 出典ラベル ---- */
-.tag{
-  display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:700;
-  padding:1px 6px;border-radius:2px;vertical-align:1px;letter-spacing:.03em;
-  background:var(--halo-wash);color:var(--halo-deep);border:1px solid #bfe0f7;
-}
-.tag.chk{background:#fff4e2;color:#a86400;border-color:#f2d2a0}
-
 /* ---- 結果 ---- */
 .metric{border-top:1px solid var(--line);padding:18px 0 6px}
 .metric:first-of-type{border-top:none}
 .mhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
-.mname{font-size:15px;font-weight:800}
+.mname{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px}
+.tierart{width:44px;height:44px;flex:none;border:1px solid var(--line);border-radius:3px;object-fit:cover;background:#f4f9fd}
 .mverdict{font-family:var(--mono);font-size:12px;font-weight:700;padding:2px 9px;border-radius:2px;background:var(--halo-wash);color:var(--halo-deep);white-space:nowrap}
 .mverdict.hot{background:#ffe9ef;color:#c9184a}
 .mverdict.cold{background:#eef1f4;color:#5a7391}
@@ -180,7 +179,7 @@ textarea{
     <button class="ghost" type="button" data-preset="normal" aria-pressed="false">通常PU募集（★3 3% / PU 0.7%）</button>
     <span id="preset-state"></span>
   </div>
-  <p class="note" style="margin:0 0 14px"><span class="tag chk">要確認</span> ★3が3%→6%に上がるとき、<b>PU個別レートが据え置きか倍増かは未確認</b>。プリセットは据え置き（0.7%）で置いてある。募集画面の提供割合表示が一次情報なので、違っていたら「確率の設定」のPU欄を直接書き換えてほしい。</p>
+  <p class="note" style="margin:0 0 14px">プリセットは★3が6%のときもPUを0.7%据え置きで置いてある。募集画面の提供割合表示と違っていたら、「確率の設定」のPU欄を直接書き換えてほしい。</p>
   <fieldset class="grid">
     <div><label for="i-n">回した数</label><input type="number" id="i-n" value="420" min="0" max="4000" step="1"></div>
     <div><label for="i-c0">開始時の呼び出しチャージ</label><input type="number" id="i-c0" value="0" min="0" max="199" step="1"></div>
@@ -205,10 +204,9 @@ textarea{
     </div>
 
     <h3 style="margin-top:16px">この計算が置いている前提</h3>
-    <p class="note"><span class="tag">確認済</span> 仮天井（100）の連では★3が確定し、そのうち50%がPU。本天井（200）でPU確定。<b>すり抜けではチャージがリセットされない。</b>チケットで引いた連もチャージに加算される。10回募集の確定枠は昇格型（★3率据え置き）なので、<b>PU率は全スロット一律</b>で、1連ずつ独立に扱うこの計算と矛盾しない。</p>
-    <p class="note"><span class="tag chk">要確認</span> <b>すでに持っているキャラのダブりでチャージがリセットされるか</b>は公式文言が明示していない。この計算はリセットされる側を仮定している。この仮定は<b>タブによって効く向きが逆</b>で、逆引き側では必要連数を多めに出す（安全側）が、実績側では期待値を低めに出すぶん同じ実測が上振れ寄りに判定される。</p>
-    <p class="note"><span class="tag chk">要確認</span> <b>チャージが募集をまたいで持ち越されるか</b>は未実測。開始チャージ欄はこれを前提に置いている。</p>
-    <p class="note"><span class="tag chk">要確認</span> <b>仮天井の連でフェス限確率が据え置かれるか</b>。既定は据え置き（PUを外した分がほぼ恒常★3に流れる）。上の選択で「非PU★3の比率で再配分」に切り替えれば、もう一方の解釈で計算し直せる。フェス限の1体あたりレートと体数も提供割合表示から入れ直してほしい。</p>
+    <p class="note">仮天井（100）の連では★3が確定し、そのうち50%がPU。本天井（200）でPU確定。<b>すり抜けではチャージがリセットされない。</b>チケットで引いた連もチャージに加算される。10回募集の確定枠は昇格型（★3率据え置き）なので、<b>PU率は全スロット一律</b>で、1連ずつ独立に扱うこの計算と矛盾しない。</p>
+    <p class="note">チャージは<b>PUを引いた時点で0に戻る</b>（すでに持っているキャラのダブりでも同じ扱い）。募集をまたいだ持ち越しも前提に置いていて、開始チャージ欄はそのための入力。</p>
+    <p class="note">仮天井の連でフェス限がどう出るかは解釈が2つある。既定は<b>据え置き</b>（PUを外した分がほぼ恒常★3に流れる）で、上の選択を「非PU★3の比率で再配分」に切り替えればもう一方で計算し直せる。フェス限の1体あたりレートと体数も、募集画面の提供割合表示から入れ直してほしい。</p>
   </details>
 
   <div class="err" id="err-a" hidden></div>
@@ -221,8 +219,9 @@ textarea{
 <section class="panel" id="panel-b" role="tabpanel" aria-labelledby="tab-b" hidden>
   <h2>ほしい物から必要連数を出す</h2>
   <p class="note" style="margin-bottom:14px">確率の設定は「実績を測る」タブと共通。開始時のチャージもそちらの値を使う。</p>
-  <fieldset class="grid">
+  <fieldset class="grid trio">
     <div><label for="i-k">PUを何体ほしいか</label><input type="number" id="i-k" value="1" min="1" max="20" step="1"></div>
+    <div><label for="i-fk">フェス限を何体ほしいか</label><input type="number" id="i-fk" value="1" min="1" max="10" step="1"></div>
     <div><label for="i-budget">使える連数（任意）</label><input type="number" id="i-budget" value="420" min="0" max="4000" step="1"></div>
   </fieldset>
   <div class="err" id="err-b" hidden></div>
@@ -419,29 +418,51 @@ function hittingTime(opt,target,spec,maxPull=40000){
   }
   return{e,p50,p80,p90,exact:true,truncated:!ended};
 }
-function pullsForSpecificFes(opt,maxPull=30000){
+/* 特定のフェス限を target 体そろえるまでの連数。
+   すり抜けではチャージが戻らないので、2体目の待ち時間は1体目を引いた瞬間の
+   チャージに依存する。1体ぶんの分布を畳み込むやり方は使えないため、
+   （チャージ × 確保済み体数）の同時分布をそのまま回して、体数が target に
+   届いた質量を吸収させている */
+function pullsForSpecificFes(opt,target){
   const o=norm(opt),H=o.hardPity,den=o.r3-o.p;
   const f1S=o.fesFlat?o.f1:(den>0?(1-o.puAtSoft)*o.f1/den:0);
+  const K=Math.max(1,Math.min(10,target|0));
   /* 確率0の対象に有限の期待連数を返さない（maxPullがそのまま答えとして出てしまう）。
      体数0のときも対象が存在しないので到達不能。ここを f1 だけで見ていると、
      実績タブが期待値0を出している設定で逆引きタブだけが有限の連数を返す */
-  if(!(o.f1>0)||!(o.nf>0))return{e:Infinity,p50:null,p80:null,p90:null,p99:null,atN:0,unreachable:true,truncated:false};
-  let g=new Float64Array(H);g[o.c0]=1;
-  const res={e:0,p50:null,p80:null,p90:null,p99:null,atN:(o.N<=0?0:null),unreachable:false,truncated:false};
+  if(!(o.f1>0)||!(o.nf>0))return{e:Infinity,p50:null,p80:null,p90:null,p99:null,atN:0,unreachable:true,truncated:false,target:K};
+  /* 打ち切り位置。裾は概ね exp(-f1・n) で減るので、残存を1e-13まで落とすには
+     平均の30倍前後が要る。K体ぶんの平均が K/f1 なので (K+35)/f1 を目安に置く。
+     同時に H×K×maxPull に天井をかけて、確率を極端に小さくされたときに
+     計算が数十秒持っていかれないようにする（そこは打ち切り警告で受ける） */
+  const want=Math.ceil((45+5*K)/o.f1);
+  const room=Math.max(3000,Math.floor(2.5e8/(H*K)));
+  const maxPull=Math.max(1,Math.min(want,room));
+  const W=K;
+  let cur=new Float64Array(H*W),nxt=new Float64Array(H*W);
+  cur[o.c0*W]=1;
+  const res={e:0,p50:null,p80:null,p90:null,p99:null,atN:(o.N<=0?0:null),unreachable:false,truncated:false,target:K};
   let prev=1,ended=false;
   for(let n=1;n<=maxPull;n++){
-    const nx=new Float64Array(H);
+    nxt.fill(0);
     for(let c=0;c<H;c++){
-      const m=g[c];if(m===0)continue;
-      const nc=c+1;let q,h;
+      const base=c*W,nc=c+1;
+      let q,h;
       if(nc===o.hardPity){q=1;h=0;}
       else if(nc===o.softPity){q=o.puAtSoft;h=f1S;}
       else{q=o.p;h=o.f1;}
-      nx[0]+=m*q;
-      if(nc<H)nx[nc]+=m*(1-q-h);
+      const other=1-q-h,nb=nc*W;
+      for(let j=0;j<W;j++){
+        const m=cur[base+j];if(m===0)continue;
+        if(q>0)nxt[j]+=m*q;                                   /* PU：チャージ0へ。体数は増えない */
+        if(nc<H){
+          if(h>0){const t=j+1;if(t<W)nxt[nb+t]+=m*h;}          /* すり抜け：体数+1、チャージは継続 */
+          if(other>0)nxt[nb+j]+=m*other;
+        }
+      }
     }
-    g=nx;
-    let surv=0;for(let c=0;c<H;c++)surv+=g[c];
+    const t=cur;cur=nxt;nxt=t;
+    let surv=0;for(let i=0;i<H*W;i++)surv+=cur[i];
     res.e+=prev;
     const cdf=1-surv;
     if(res.p50===null&&cdf>=.5)res.p50=n;
@@ -449,15 +470,24 @@ function pullsForSpecificFes(opt,maxPull=30000){
     if(res.p90===null&&cdf>=.9)res.p90=n;
     if(res.p99===null&&cdf>=.99)res.p99=n;
     if(res.atN===null&&n>=o.N)res.atN=cdf;
+    /* 収束判定は残存確率そのものではなく、期待連数に残っている寄与で行う。
+       残りは Σ P(T>m) で、直近の減衰率 ρ を使えば surv・ρ/(1−ρ) で上から押さえられる。
+       残存 1e-13 を基準にすると、5体・10体のように裾が厚い場合に
+       値は合っているのに打ち切り警告だけが立ってしまう */
+    const rho=prev>0?surv/prev:0;
     prev=surv;
-    if(surv<1e-13){ended=true;break;}
+    if(surv<1e-13||(n>50&&rho<1&&surv*rho/(1-rho)<1e-10)){ended=true;break;}
   }
   if(res.atN===null)res.atN=1-prev;
   res.truncated=!ended;
+  res.maxPull=maxPull;
   return res;
 }
 
 /* ============ 画面 ============ */
+/* 公開URL。ここを空にしておくと、公開先で開いたときのURLがコピー文に自動で入る。
+   短縮URLなどを使いたいときだけ、ここに直接書く */
+const SITE_URL='';
 const $=id=>document.getElementById(id);
 const fx=(v,n=2)=>Number(v).toFixed(n);
 /* v===0 は「小さい」ではなく「起こらない」なので、0.0001%未満とは書かない */
@@ -528,23 +558,44 @@ function ribbon(d,obs,exp,label){
   </svg>`;
 }
 
-function verdict(up,down){
-  if(up<=0.01)return['hot','大上振れ 上位'+pc(up)];
-  if(up<=0.10)return['hot','上振れ 上位'+pc(up)];
-  if(up<=0.35)return['','やや上 上位'+pc(up)];
-  if(down<=0.01)return['cold','大下振れ 下位'+pc(down)];
-  if(down<=0.10)return['cold','下振れ 下位'+pc(down)];
-  if(down<=0.35)return['cold','やや下 下位'+pc(down)];
-  return['','ほぼ期待どおり'];
+/* 上振れレベル7段。分岐の境目は元の判定と同じで、名前とゲージを付けた。
+   bar は全角の■□なので、環境を選ばずXにそのまま貼れる */
+const TIERS=[
+  {k: 3,name:'神引き',  bar:'■■■■■■■',cls:'hot'},
+  {k: 2,name:'大上振れ',bar:'■■■■■■□',cls:'hot'},
+  {k: 1,name:'上振れ',  bar:'■■■■■□□',cls:''},
+  {k: 0,name:'順当',    bar:'■■■■□□□',cls:''},
+  {k:-1,name:'下振れ',  bar:'■■■□□□□',cls:'cold'},
+  {k:-2,name:'大下振れ',bar:'■■□□□□□',cls:'cold'},
+  {k:-3,name:'爆死',    bar:'■□□□□□□',cls:'bad'},
+];
+function tierOf(up,down){
+  if(up<=0.01)return TIERS[0];
+  if(up<=0.10)return TIERS[1];
+  if(up<=0.35)return TIERS[2];
+  if(down<=0.01)return TIERS[6];
+  if(down<=0.10)return TIERS[5];
+  if(down<=0.35)return TIERS[4];
+  return TIERS[3];
 }
+/* 上振れレベルごとの画像。URLを入れるとレベル名の左に出る。空なら何も出ない。
+   表示は44px角なので、素材は88px角前後の正方形が扱いやすい。
+   例）TIER_ART[3]='img/tier3.png'
+   ゲームの公式素材をそのまま置く場合は配布条件の確認が要る */
+const TIER_ART={'3':'','2':'','1':'','0':'','-1':'','-2':'','-3':''};
+/* 側（上振れ側か下振れ側か）と、その裾の確率 */
+const sideOf=(up,down)=>up<=down?{w:'上位',v:up}:{w:'下位',v:down};
 
 function metricBlock(name,s,obs,naive,note){
   const LAST=s.dist.length-1, over=obs>LAST;
   const up=tailUp(s.dist,obs),down=tailDown(s.dist,obs);
-  const [cls,txt]=over?['bad','計算範囲外']:verdict(up,down);
+  const t=over?null:tierOf(up,down), sd=over?null:sideOf(up,down);
+  const cls=over?'bad':t.cls;
+  const txt=over?'計算範囲外':`${t.bar} ${t.name} ${sd.w}${pc(sd.v)}`;
+  const art=over?'':TIER_ART[String(t.k)];
   const sig=s.sd>0?(obs-s.e)/s.sd:0;
   return `<div class="metric">
-    <div class="mhead"><div class="mname">${esc(name)}</div><div class="mverdict ${cls}">${esc(txt)}</div></div>
+    <div class="mhead"><div class="mname">${art?`<img class="tierart" src="${esc(art)}" alt="">`:''}${esc(name)}</div><div class="mverdict ${cls}">${esc(txt)}</div></div>
     <div class="mnums">
       <div><span>期待値</span><b>${fx(s.e,2)}</b></div>
       <div><span>標準偏差</span><b>${fx(s.sd,2)}</b></div>
@@ -657,18 +708,43 @@ function runA(){
   </div>`;
   $('out-a').innerHTML=html;
 
-  const up3=tailUp(r.star3.dist,obs.o3),upP=tailUp(r.pu.dist,obs.opu),upF=tailUp(r.fes.dist,obs.ofes);
-  const uv=(d,x,v)=>x>d.length-1?'範囲外':'上位'+pc(v);
+  /* ---- Xに貼る用 ----
+     スマホのタイムラインは全角17〜18字あたりで折り返すので、どの行もそこに収める。
+     体数そのものより「実測の率」と「天井込みの期待率」を並べたほうが、
+     読んだ側が自分の結果と比べられる */
+  const rt=v=>o.N>0?fx(100*v/o.N,2)+'%':'—';
+  const pcs=v=>v>=0.0001?pc(v):'0.01%未満';
+  const blk=(label,st,ob)=>{
+    if(ob>st.dist.length-1)return `${label} 実測${rt(ob)}／期待${rt(st.e)}\n計算範囲外（入力を確認）`;
+    const up=tailUp(st.dist,ob),dn=tailDown(st.dist,ob);
+    const s=sideOf(up,dn),t=tierOf(up,dn);
+    return `${label} 実測${rt(ob)}／期待${rt(st.e)}\n${t.bar} ${t.name} ${s.w}${pcs(s.v)}`;
+  };
+  const head=`${o.N}連　★3 ${obs.o3}体（PU ${obs.opu}体）`;
+  const fesBlk=(o.f1*o.nf>0)?'\n\n'+blk('フェス限',r.fes,obs.ofes):'';
+  /* 設定行は既定（周年フェス／通常PU募集）と違うときだけ出す。
+     読む側が知りたいのは「既定と違うとき」だけで、毎回並べると長くなるだけ */
+  const stdPity=o.softPity===100&&o.hardPity===200&&Math.abs(o.puAtSoft-0.5)<1e-9&&o.fesFlat;
+  const stdStruct=stdPity&&o.c0===0;
+  const stdRates=Math.abs(o.p-0.007)<1e-9&&(
+    (Math.abs(o.r3-0.06)<1e-9&&Math.abs(o.f1-0.001)<1e-9&&o.nf===9)||
+    (Math.abs(o.r3-0.03)<1e-9&&o.f1*o.nf===0));
+  const setLine=(stdStruct&&stdRates)?'':
+    `\n※設定 ★3 ${fx(o.r3*100,1)}%／PU ${fx(o.p*100,1)}%`
+    +(o.f1*o.nf>0?`\n　　　 フェス限 ${fx(o.f1*100,2)}%×${o.nf}体`:'')
+    +(o.c0>0?`\n　　　 開始チャージ ${o.c0}`:'')
+    +(stdPity?'':`\n　　　 仮天井 ${o.softPity}／本天井 ${o.hardPity}`);
+  /* URLは SITE_URL が空なら、公開先で開いたときの自分のURLを自動で使う */
+  const url=SITE_URL||(location.protocol.indexOf('http')===0?location.origin+location.pathname:'');
   lastCopy=
-`${o.N}連の結果を天井込みの分布で判定
-─────────────
-★3    期待${fx(r.star3.e,2)} → 実測${obs.o3}（${uv(r.star3.dist,obs.o3,up3)}／${((obs.o3-r.star3.e)/r.star3.sd>=0?'+':'')}${fx((obs.o3-r.star3.e)/r.star3.sd,2)}σ）
-PU    期待${fx(r.pu.e,2)} → 実測${obs.opu}（${uv(r.pu.dist,obs.opu,upP)}）
-フェス限 期待${fx(r.fes.e,2)} → 実測${obs.ofes}（${uv(r.fes.dist,obs.ofes,upF)}）
-─────────────
-PU期待値の${pc(pitySh)}は天井が作っている分。
-表示確率とそのまま比べると運を読み違える。
-設定：★3 ${fx(o.r3*100,1)}% / PU ${fx(o.p*100,1)}% / フェス限 ${fx(o.f1*100,2)}%×${o.nf}体 / 開始チャージ${o.c0}`;
+`■ブルアカ ガチャ上振れ判定■
+${head}
+
+${blk('★3',r.star3,obs.o3)}
+
+${blk('PU',r.pu,obs.opu)}${fesBlk}
+${setLine?'\n'+setLine.slice(1)+'\n':''}
+#ブルアカ${url?'\n'+url:''}`;
   $('copytext').value=lastCopy;
   $('copybtn').addEventListener('click',()=>{
     const t=$('copytext');t.select();
@@ -690,6 +766,7 @@ function runB(){
   if(errs.length){box.hidden=false;box.innerHTML=errs.map(esc).join('<br>');$('out-b').innerHTML='';return;}
   box.hidden=true;
   const k=Math.max(1,Math.min(20,+$('i-k').value|0));
+  const fk=Math.max(1,Math.min(10,+$('i-fk').value|0));
   const budget=Math.max(0,Math.min(4000,+$('i-budget').value|0));
   const stone=o.stone;
   const st=n=>isFinite(n)?Math.round(n*stone).toLocaleString()+'石':'—';
@@ -701,7 +778,7 @@ function runB(){
   for(let i=1;i<=top;i++)puRows.push(row(i,i===k));
   if(k>top)puRows.push(row(k,true));   /* 11体以上を指定したとき、その行が表から消えないように */
   const kq=pullsForPU(k,o);
-  const fs=pullsForSpecificFes(Object.assign({},o,{N:budget}));
+  const fs=pullsForSpecificFes(Object.assign({},o,{N:budget}),fk);
   const inf=v=>v===null?'到達せず':v.toLocaleString()+'連';
 
   $('out-b').innerHTML=`
@@ -721,12 +798,12 @@ function runB(){
 
   <div class="card">
     <div class="eyebrow"><span>Fes-limited</span></div>
-    <h2>特定のフェス限すり抜けを1体狙うとき</h2>
+    <h2>特定のフェス限すり抜けを${fk}体狙うとき</h2>
     ${fs.unreachable?`<p class="note alert">${o.nf>0?'フェス限の1体あたり確率が0%に設定されている':'フェス限の体数が0体に設定されている'}ので、この対象は何連回しても出ない。設定欄の「フェス限 1体あたり」と「フェス限の体数」を入れ直してほしい。</p>`:`
     <div class="mnums" style="margin-bottom:10px">
       <div><span>期待連数</span><b class="big">${isFinite(fs.e)?fx(fs.e,0)+'連':'—'}</b></div>
       <div><span>石換算</span><b>${st(fs.e)}</b></div>
-      <div><span>${budget}連で1体以上出る確率</span><b>${pc(fs.atN)}</b></div>
+      <div><span>${budget}連で${fk}体そろう確率</span><b>${pc(fs.atN)}</b></div>
     </div>
     <table><thead><tr><th>達成率</th><th class="num">必要連数</th><th class="num">石換算</th></tr></thead><tbody>
       <tr><td>半分の人が届く</td><td class="num">${inf(fs.p50)}</td><td class="num">${fs.p50?st(fs.p50):'—'}</td></tr>
@@ -734,8 +811,8 @@ function runB(){
       <tr><td>9割の人が届く</td><td class="num">${inf(fs.p90)}</td><td class="num">${fs.p90?st(fs.p90):'—'}</td></tr>
       <tr><td>99%の人が届く</td><td class="num">${inf(fs.p99)}</td><td class="num">${fs.p99?st(fs.p99):'—'}</td></tr>
     </tbody></table>
-    ${fs.truncated?`<p class="note alert">確率が低すぎて30,000連まで計算しても収束しなかった。期待連数はこの値より大きい。</p>`:''}`}
-    <p class="note">フェス限のすり抜けは天井が一切保証してくれない。上限のない裸の確率なので、PUと違って「回せば必ず来る」が成立しない。狙って取りに行く対象ではなく、PUを追う過程の副産物として扱うのが妥当。</p>
+    ${fs.truncated?`<p class="note alert">確率が低すぎて${fs.maxPull.toLocaleString()}連まで計算しても収束しなかった。期待連数はここに出ている値より大きい。「到達せず」の行も、届かないという意味ではなく打ち切った先にあるという意味。</p>`:''}`}
+    <p class="note">フェス限のすり抜けは天井が一切保証してくれない。上限のない裸の確率なので、PUと違って「回せば必ず来る」が成立しない。${fk>1?`天井による頭打ちが働かないぶん、必要連数は体数にほぼ比例して伸びる。`:''}狙って取りに行く対象ではなく、PUを追う過程の副産物として扱うのが妥当。</p>
   </div>`;
 }
 
