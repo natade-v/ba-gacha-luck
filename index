@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>呼び出しチャージ計算機 ｜ ブルアカ ガチャ上振れ判定</title>
+<meta name="description" content="呼び出しチャージの天井を織り込んだ分布を作り、あなたのガチャ結果がその中のどこに立っているかを返します。必要連数の逆引きにも対応。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="呼び出しチャージ計算機｜ブルアカ ガチャ上振れ判定">
+<meta property="og:description" content="天井が入っているので、表示確率と実測をそのまま比べると運を読み違える。天井込みの分布であなたの位置を測ります。">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="呼び出しチャージ計算機｜ブルアカ ガチャ上振れ判定">
+<meta name="twitter:description" content="天井込みの分布で、あなたのガチャ結果の位置を測る。必要連数の逆引きつき。">
+<style>
+:root{
+  --void:#0d1b2e; --slate:#5a7391; --line:#c9dbec;
+  --mist:#e9f1f8; --card:#ffffff;
+  --halo:#43b7f5; --halo-deep:#1a63b8; --halo-wash:#dff0fd;
+  --bloom:#ff6f91; --gold:#f0a02a;
+  --jp:"Hiragino Kaku Gothic ProN","Yu Gothic Medium","Yu Gothic","Noto Sans JP","Meiryo",sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:
+    radial-gradient(1100px 480px at 12% -8%, #f7fcff 0%, rgba(247,252,255,0) 62%),
+    var(--mist);
+  color:var(--void); font-family:var(--jp); line-height:1.7;
+  -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:940px;margin:0 auto;padding:28px 18px 72px}
+
+/* ---- 見出しまわり ---- */
+.eyebrow{
+  display:inline-block; font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:.2em; text-transform:uppercase; color:#fff; background:var(--halo-deep);
+  padding:4px 14px 4px 10px; transform:skewX(-14deg); margin-bottom:10px;
+}
+.eyebrow span{display:inline-block;transform:skewX(14deg)}
+h1{font-size:clamp(25px,5.6vw,38px);font-weight:800;letter-spacing:-.02em;margin:.1em 0 .35em;line-height:1.25}
+h1 em{font-style:normal;color:var(--halo-deep)}
+.thesis{margin:0 0 4px;color:var(--slate);font-size:14.5px;max-width:60ch}
+.thesis b{color:var(--void);font-weight:700}
+h2{font-size:19px;font-weight:800;letter-spacing:-.01em;margin:0 0 14px}
+h3{font-size:14px;font-weight:800;margin:0 0 8px;color:var(--halo-deep)}
+
+/* ---- カード ---- */
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:3px;
+  padding:20px; margin:16px 0; box-shadow:0 1px 0 rgba(13,27,46,.04);
+}
+.card.tight{padding:16px 18px}
+
+/* ---- タブ ---- */
+.tabs{display:flex;gap:6px;margin:26px 0 0;flex-wrap:wrap}
+.tab{
+  font-family:var(--jp);font-size:13.5px;font-weight:800;cursor:pointer;
+  border:1px solid var(--line);border-bottom:none;background:#f4f9fd;color:var(--slate);
+  padding:9px 20px;transform:skewX(-14deg);border-radius:3px 3px 0 0;
+}
+.tab>span{display:inline-block;transform:skewX(14deg)}
+.tab[aria-selected="true"]{background:var(--card);color:var(--halo-deep);box-shadow:inset 0 3px 0 var(--halo)}
+.tab:focus-visible{outline:2px solid var(--halo-deep);outline-offset:2px}
+.panel{border:1px solid var(--line);background:var(--card);padding:22px;border-radius:0 3px 3px 3px}
+.panel[hidden]{display:none}
+
+/* ---- フォーム ---- */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label{display:block;font-size:11.5px;font-weight:700;color:var(--slate);letter-spacing:.04em;margin-bottom:4px}
+select{
+  width:100%;font-family:var(--jp);font-size:14px;font-weight:600;color:var(--void);
+  padding:9px 8px;border:1px solid var(--line);border-radius:2px;background:#fbfdff;
+}
+select:focus{outline:2px solid var(--halo);outline-offset:-1px}
+input[type=number]{
+  width:100%;font-family:var(--mono);font-size:16px;font-weight:600;color:var(--void);
+  padding:9px 10px;border:1px solid var(--line);border-radius:2px;background:#fbfdff;
+  font-variant-numeric:tabular-nums;
+}
+input[type=number]:focus{outline:2px solid var(--halo);outline-offset:-1px;background:#fff}
+fieldset{border:none;padding:0;margin:0}
+details{margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
+summary{cursor:pointer;font-size:12.5px;font-weight:800;color:var(--halo-deep);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸ ";}
+details[open] summary::before{content:"▾ ";}
+.presets{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 8px}
+button{
+  font-family:var(--jp);font-size:13px;font-weight:800;cursor:pointer;
+  border:1px solid var(--halo-deep);background:var(--halo-deep);color:#fff;
+  padding:8px 16px;border-radius:2px;
+}
+button.ghost{background:#fff;color:var(--halo-deep)}
+/* 選択中は白地／青字を反転。色だけに頼らないようチェック印も出す */
+button.ghost[aria-pressed="true"]{background:var(--halo-deep);color:#fff;box-shadow:0 0 0 3px var(--halo-wash)}
+button.ghost[aria-pressed="true"]::before{content:"✓\00a0"}
+button:focus-visible{outline:2px solid var(--void);outline-offset:2px}
+button:hover{filter:brightness(1.08)}
+#preset-state{font-size:11.5px;color:var(--slate);font-weight:700}
+.run{width:100%;padding:13px;font-size:15px;letter-spacing:.05em;margin-top:16px}
+
+/* ---- 出典ラベル ---- */
+.tag{
+  display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:700;
+  padding:1px 6px;border-radius:2px;vertical-align:1px;letter-spacing:.03em;
+  background:var(--halo-wash);color:var(--halo-deep);border:1px solid #bfe0f7;
+}
+.tag.chk{background:#fff4e2;color:#a86400;border-color:#f2d2a0}
+
+/* ---- 結果 ---- */
+.metric{border-top:1px solid var(--line);padding:18px 0 6px}
+.metric:first-of-type{border-top:none}
+.mhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.mname{font-size:15px;font-weight:800}
+.mverdict{font-family:var(--mono);font-size:12px;font-weight:700;padding:2px 9px;border-radius:2px;background:var(--halo-wash);color:var(--halo-deep);white-space:nowrap}
+.mverdict.hot{background:#ffe9ef;color:#c9184a}
+.mverdict.cold{background:#eef1f4;color:#5a7391}
+.mverdict.bad{background:#fff1f4;color:#a4133c}
+.mnums{display:flex;gap:22px;flex-wrap:wrap;margin:8px 0 4px;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.mnums div span{display:block;font-family:var(--jp);font-size:10.5px;font-weight:700;color:var(--slate);letter-spacing:.05em}
+.mnums b{font-size:17px;font-weight:700}
+.big{color:var(--halo-deep)}
+.ribbon{width:100%;height:78px;display:block;margin-top:6px}
+.note{font-size:12px;color:var(--slate);margin:6px 0 0}
+.note.alert{color:#a4133c;font-weight:700}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:11px;letter-spacing:.06em;color:var(--slate);border-bottom:2px solid var(--halo)}
+td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tbody tr:hover{background:#f7fbfe}
+
+.stack{display:flex;height:26px;border:1px solid var(--line);border-radius:2px;overflow:hidden;margin:10px 0 6px}
+.stack i{display:block;height:100%}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--slate)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;border-radius:1px}
+
+textarea{
+  width:100%;min-height:150px;font-family:var(--mono);font-size:12px;line-height:1.65;
+  border:1px solid var(--line);border-radius:2px;padding:12px;background:#fbfdff;color:var(--void);resize:vertical;
+}
+.err{background:#fff1f4;border:1px solid #ffc2d0;color:#a4133c;padding:11px 14px;font-size:13px;border-radius:2px;margin:12px 0}
+.err[hidden]{display:none}
+.foot{margin-top:34px;font-size:11.5px;color:var(--slate);border-top:1px solid var(--line);padding-top:16px}
+.foot code{font-family:var(--mono);background:#fff;padding:1px 5px;border:1px solid var(--line)}
+.foot dt{font-weight:800;color:var(--void);margin-top:10px}
+.foot dd{margin:2px 0 0 1em}
+.busy{opacity:.45;pointer-events:none}
+@media (prefers-reduced-motion:no-preference){
+  .metric,.card{animation:rise .28s ease-out both}
+  @keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+}
+@media (max-width:520px){
+  .panel{padding:16px 14px}
+  .mnums{gap:16px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow"><span>Recruitment Charge Analyzer</span></div>
+  <h1>ガチャ、<em>本当に</em>上振れてた？</h1>
+  <p class="thesis">呼び出しチャージには天井が入っている。だから<b>表示確率と実測をそのまま比べると運を読み違える</b>。このページは天井を織り込んだ分布を作って、あなたの結果がその中のどこに立っているかを返す。</p>
+</header>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" id="tab-a" aria-controls="panel-a" aria-selected="true"><span>実績を測る</span></button>
+  <button class="tab" role="tab" id="tab-b" aria-controls="panel-b" aria-selected="false"><span>必要連数を逆引き</span></button>
+</div>
+
+<!-- ============ 実績を測る ============ -->
+<section class="panel" id="panel-a" role="tabpanel" aria-labelledby="tab-a">
+  <h2>回した結果を入れる</h2>
+  <div class="presets">
+    <button class="ghost" type="button" data-preset="fes" aria-pressed="false">周年フェス（★3 6% / PU 0.7%）</button>
+    <button class="ghost" type="button" data-preset="normal" aria-pressed="false">通常PU募集（★3 3% / PU 0.7%）</button>
+    <span id="preset-state"></span>
+  </div>
+  <p class="note" style="margin:0 0 14px"><span class="tag chk">要確認</span> ★3が3%→6%に上がるとき、<b>PU個別レートが据え置きか倍増かは未確認</b>。プリセットは据え置き（0.7%）で置いてある。募集画面の提供割合表示が一次情報なので、違っていたら「確率の設定」のPU欄を直接書き換えてほしい。</p>
+  <fieldset class="grid">
+    <div><label for="i-n">回した数</label><input type="number" id="i-n" value="420" min="0" max="4000" step="1"></div>
+    <div><label for="i-c0">開始時の呼び出しチャージ</label><input type="number" id="i-c0" value="0" min="0" max="199" step="1"></div>
+    <div><label for="i-o3">実測 ★3の合計</label><input type="number" id="i-o3" value="38" min="0" step="1"></div>
+    <div><label for="i-opu">実測 PU</label><input type="number" id="i-opu" value="6" min="0" step="1"></div>
+    <div><label for="i-ofes">実測 フェス限すり抜け</label><input type="number" id="i-ofes" value="7" min="0" step="1"></div>
+  </fieldset>
+  <p class="note">チャージは<b>通常ピックアップ用と限定・周年限定用の2系統</b>に分かれていて共有されない。測りたい募集と同じ系統のチャージを入れてほしい。</p>
+
+  <details>
+    <summary>確率の設定を開く</summary>
+    <div class="grid" style="margin-top:12px">
+      <div><label for="i-r3">★3 合計（%）</label><input type="number" id="i-r3" value="6" min="0.01" max="100" step="0.1"></div>
+      <div><label for="i-p">PU 1体（%）</label><input type="number" id="i-p" value="0.7" min="0" max="100" step="0.1"></div>
+      <div><label for="i-f1">フェス限 1体あたり（%）</label><input type="number" id="i-f1" value="0.1" min="0" max="100" step="0.05"></div>
+      <div><label for="i-nf">フェス限の体数</label><input type="number" id="i-nf" value="9" min="0" max="60" step="1"></div>
+      <div><label for="i-sp">仮天井の位置（連）</label><input type="number" id="i-sp" value="100" min="1" max="999" step="1"></div>
+      <div><label for="i-spp">仮天井のPU率（%）</label><input type="number" id="i-spp" value="50" min="0" max="100" step="1"></div>
+      <div><label for="i-hp">本天井の位置（連）</label><input type="number" id="i-hp" value="200" min="2" max="999" step="1"></div>
+      <div><label for="i-stone">1連あたりの青輝石</label><input type="number" id="i-stone" value="120" min="1" step="1"></div>
+      <div><label for="i-fmode">仮天井でのフェス限確率</label><select id="i-fmode"><option value="flat" selected>据え置き</option><option value="prop">非PU★3の比率で再配分</option></select></div>
+    </div>
+
+    <h3 style="margin-top:16px">この計算が置いている前提</h3>
+    <p class="note"><span class="tag">確認済</span> 仮天井（100）の連では★3が確定し、そのうち50%がPU。本天井（200）でPU確定。<b>すり抜けではチャージがリセットされない。</b>チケットで引いた連もチャージに加算される。10回募集の確定枠は昇格型（★3率据え置き）なので、<b>PU率は全スロット一律</b>で、1連ずつ独立に扱うこの計算と矛盾しない。</p>
+    <p class="note"><span class="tag chk">要確認</span> <b>すでに持っているキャラのダブりでチャージがリセットされるか</b>は公式文言が明示していない。この計算はリセットされる側を仮定している。この仮定は<b>タブによって効く向きが逆</b>で、逆引き側では必要連数を多めに出す（安全側）が、実績側では期待値を低めに出すぶん同じ実測が上振れ寄りに判定される。</p>
+    <p class="note"><span class="tag chk">要確認</span> <b>チャージが募集をまたいで持ち越されるか</b>は未実測。開始チャージ欄はこれを前提に置いている。</p>
+    <p class="note"><span class="tag chk">要確認</span> <b>仮天井の連でフェス限確率が据え置かれるか</b>。既定は据え置き（PUを外した分がほぼ恒常★3に流れる）。上の選択で「非PU★3の比率で再配分」に切り替えれば、もう一方の解釈で計算し直せる。フェス限の1体あたりレートと体数も提供割合表示から入れ直してほしい。</p>
+  </details>
+
+  <div class="err" id="err-a" hidden></div>
+  <button class="run" id="go-a" type="button">この結果を判定する</button>
+
+  <div id="out-a"></div>
+</section>
+
+<!-- ============ 逆引き ============ -->
+<section class="panel" id="panel-b" role="tabpanel" aria-labelledby="tab-b" hidden>
+  <h2>ほしい物から必要連数を出す</h2>
+  <p class="note" style="margin-bottom:14px">確率の設定は「実績を測る」タブと共通。開始時のチャージもそちらの値を使う。</p>
+  <fieldset class="grid">
+    <div><label for="i-k">PUを何体ほしいか</label><input type="number" id="i-k" value="1" min="1" max="20" step="1"></div>
+    <div><label for="i-budget">使える連数（任意）</label><input type="number" id="i-budget" value="420" min="0" max="4000" step="1"></div>
+  </fieldset>
+  <div class="err" id="err-b" hidden></div>
+  <button class="run" id="go-b" type="button">必要連数を計算する</button>
+  <div id="out-b"></div>
+</section>
+
+<div class="foot">
+  <p>計算は呼び出しチャージのマルコフ連鎖を全数展開した厳密解で、乱数シミュレーションではない。★3の分布は「天井連と通常連で引いたPUの合計 ＋ 残り連の二項分布」に分解して求めている。<b>厳密なのはチャージ軸で、体数軸は9σ相当で頭打ちにしている</b>（畳み込まれる質量は1e-20未満）。<b>実効レート換算の表で ※近似 が付いた行だけは厳密解ではない。</b></p>
+  <dl>
+    <dt>検算に使ったもの</dt>
+    <dd><code>E[T1]=90.0723連</code>（チャージ0からPU1体目まで）。<b>この値は★3率に依存せず</b>、PU率と天井構造だけで決まる。</dd>
+    <dd>チャージ別の期待連数 <code>E[T1|c]</code> を c=0/10/20/34/40/50/60/70/80/90/99/100/150/190/199 の15点で、独立に計算された既存の分析値と小数第3位まで照合。</dd>
+    <dd>標準偏差 <code>58.6911</code>、100連目にPUが出る確率 <code>24.943%</code>、本天井で出る確率 <code>12.443%</code>、2体目までの <code>180.1445連 / SD 83.002</code> も一致。</dd>
+    <dd>★3・PU・フェス限の各期待値を、DPを使わない独立実装の乱数100万試行と突き合わせて標準誤差の範囲内。各分布の確率合計は誤差1e-13以下で1（切り落とした裾は最終ビンへ畳み込み、二項分布側は合計1で正規化している）。</dd>
+    <dd>必要連数は独立した2実装（吸収マルコフ連鎖 ／ 到達時間の畳み込み）で相互検算。相対差は1e-14以下で、絶対差は目標体数に比例し20体で1e-11程度。</dd>
+    <dt>数字の読み方</dt>
+    <dd>石換算は<b>募集回数特典で配られる10連チケットを織り込んでいない</b>ので、実際に払う石はここに出る数より安くなる。</dd>
+    <dd>数値はゲーム内の提供割合表示を入力した場合のもの。仕様変更があれば設定欄を書き換えて使ってほしい。</dd>
+  </dl>
+</div>
+
+</div>
+
+<script>
+'use strict';
+/* ============ 計算コア ============ */
+function defaults(){return{N:420,c0:0,p:0.007,r3:0.06,f1:0.001,nf:9,softPity:100,puAtSoft:0.5,hardPity:200,fesFlat:true};}
+const norm=o=>Object.assign(defaults(),o||{});
+function puProb(charge,o){if(charge===o.hardPity)return 1;if(charge===o.softPity)return o.puAtSoft;return o.p;}
+const LF=[0,0];
+function binomPmf(n,pr){
+  const out=new Float64Array(n+1);
+  if(n===0||pr<=0){out[0]=1;return out;}
+  if(pr>=1){out[n]=1;return out;}
+  for(let i=LF.length;i<=n;i++)LF[i]=LF[i-1]+Math.log(i);
+  const la=Math.log(pr),lb=Math.log1p(-pr);
+  for(let k=0;k<=n;k++)out[k]=Math.exp(LF[n]-LF[k]-LF[n-k]+k*la+(n-k)*lb);
+  /* n=4000 では LF[n] が3万近くになり、対数差の丸めが各項に1e-12ほどの相対誤差を
+     残す。積み上げると★3分布の合計が1から1e-11ずれ、上位%の分母が静かに狂うので、
+     二項分布が満たすべき「合計1」でここを畳み直す */
+  let t=0;for(let k=0;k<=n;k++)t+=out[k];
+  if(t>0&&t!==1)for(let k=0;k<=n;k++)out[k]/=t;
+  return out;
+}
+function jointDP(o,cap,spec){
+  const H=o.hardPity,W=cap+1;
+  let cur=new Float64Array(H*W),nxt=new Float64Array(H*W);
+  cur[o.c0*W]=1;
+  for(let step=0;step<o.N;step++){
+    nxt.fill(0);
+    const kMax=Math.min(cap,step),cMax=Math.min(H-1,o.c0+step);
+    for(let c=0;c<=cMax;c++){
+      const base=c*W,nc=c+1,q=puProb(nc,o),s=spec(nc,o);
+      const hit=s.hit,other=1-q-hit,nb=nc*W,add=s.onPU;
+      for(let k=0;k<=kMax;k++){
+        const m=cur[base+k];
+        if(m===0)continue;
+        if(q>0){const t=k+add;nxt[t<cap?t:cap]+=m*q;}
+        /* nc===H は必ず PU 確定で 0 に戻るので、チャージを進める枝には入らない。
+           ガードが無いと nb=H*W が配列外になり、TypedArray は例外を出さずに黙って
+           質量を捨てる。hittingTime 側と同じ形に揃えてある */
+        if(nc<H){
+          if(hit>0){const t=k+1;nxt[nb+(t<cap?t:cap)]+=m*hit;}
+          if(other>0)nxt[nb+k]+=m*other;
+        }
+      }
+    }
+    const t=cur;cur=nxt;nxt=t;
+  }
+  const out=new Float64Array(W);
+  for(let c=0;c<H;c++)for(let k=0;k<W;k++)out[k]+=cur[c*W+k];
+  return out;
+}
+const stat=d=>{let e=0,e2=0;for(let k=0;k<d.length;k++){e+=k*d[k];e2+=k*k*d[k];}return{e,sd:Math.sqrt(Math.max(0,e2-e*e)),dist:d};};
+const capFor=(m,x)=>Math.max(4,Math.ceil(m+9*Math.sqrt(m+1)+x));
+/* jointDP の内側ループ回数を先に見積もる。本天井を大きく・PU率を高く設定すると
+   N×H×cap が跳ね上がり、設定次第で分単位の停止が起きるため、着手前に弾く */
+function dpCost(o,cap){
+  let t=0;
+  for(let s=0;s<o.N;s++)t+=(Math.min(o.hardPity-1,o.c0+s)+1)*(Math.min(cap,s)+1);
+  return t;
+}
+/* 実測でコスト1e8あたり約0.85秒。既定設定の上限（4000連）が2.7e8＝約2.3秒、
+   本天井を999まで上げた極端な設定でも1.3e9＝約11秒。ここを境にすると、
+   PU率を数十%に上げたような設定（1.3e10＝約2分）だけが落ちる */
+const COST_LIMIT=1.5e9;
+
+function analyze(opt){
+  const o=norm(opt);
+  const f=o.f1*o.nf,nonPU3=o.r3-o.p;
+  /* prop モードは非PU★3の総量で割る。r3=p の縮退で 0/0 を作らないよう保護 */
+  const fSoftAbs=o.fesFlat?f:(nonPU3>0?(1-o.puAtSoft)*f/nonPU3:0);
+  const f1SoftAbs=o.fesFlat?o.f1:(nonPU3>0?(1-o.puAtSoft)*o.f1/nonPU3:0);
+  const w=nonPU3/(1-o.p),H=o.hardPity;
+  let ch=new Float64Array(H);ch[o.c0]=1;
+  let eSoft=0,eHard=0;
+  for(let s=0;s<o.N;s++){
+    const nx=new Float64Array(H);
+    for(let c=0;c<H;c++){
+      const m=ch[c];if(m===0)continue;
+      const nc=c+1,q=puProb(nc,o);
+      if(nc===o.softPity)eSoft+=m;
+      if(nc===o.hardPity)eHard+=m;
+      if(q>0)nx[0]+=m*q;
+      if(q<1)nx[nc]+=m*(1-q);
+    }
+    ch=nx;
+  }
+  const ePity=eSoft+eHard;
+  const eFes=(o.N-ePity)*f+eSoft*fSoftAbs;
+  const ePu=o.N*o.p+eSoft*(o.puAtSoft-o.p)+eHard*(1-o.p);
+  const eG=ePity+(o.N-ePity)*o.p;
+  /* cap は N でも頭打ちにする。N連で N+1 体は出ない。
+     3つとも「1連あたり最大1しか増えない」量なので、N は真の上限であり質量は落ちない */
+  const capPu=Math.min(o.N,capFor(ePu,8)),
+        capFes=Math.min(o.N,capFor(eFes,12)),
+        capG=Math.min(o.N,capFor(eG,10));
+  const cost=dpCost(o,capPu)+dpCost(o,capFes)+dpCost(o,capG);
+  if(cost>COST_LIMIT)return{tooHeavy:true,cost};
+  const pu=stat(jointDP(o,capPu,()=>({onPU:1,hit:0})));
+  const fes=stat(jointDP(o,capFes,
+    (nc,oo)=>nc===oo.hardPity?{onPU:0,hit:0}:nc===oo.softPity?{onPU:0,hit:fSoftAbs}:{onPU:0,hit:f}));
+  const gDist=jointDP(o,capG,
+    (nc,oo)=>nc===oo.softPity?{onPU:1,hit:1-oo.puAtSoft}:{onPU:1,hit:0});
+  const s3=new Float64Array(o.N+1);
+  for(let g=0;g<gDist.length;g++){
+    if(gDist[g]<1e-15)continue;
+    const b=binomPmf(o.N-g,w);
+    for(let k=0;k<b.length;k++)s3[g+k]+=gDist[g]*b[k];
+  }
+  /* 裾を切るときは捨てずに最終ビンへ畳み込む。切り捨てると N=4000 で合計が
+     1e-11 ほど目減りし、上位%の分母が静かにずれる */
+  let hi=s3.length-1;while(hi>0&&s3[hi]<1e-15)hi--;
+  const cut=s3.slice(0,hi+1);
+  let rest=0;for(let k=hi+1;k<s3.length;k++)rest+=s3[k];
+  cut[hi]+=rest;
+  const star3=stat(cut);
+  return{o,f,fSoftAbs,f1SoftAbs,eSoft,eHard,ePity,star3,pu,fes,tooHeavy:false,
+    fesAny1:{e:(o.N-ePity)*o.f1+eSoft*f1SoftAbs},
+    puNaive:o.N*o.p,star3Naive:o.N*o.r3,fesNaive:o.N*f,fes1Naive:o.N*o.f1};
+}
+const tailUp=(d,x)=>{let s=0;for(let k=Math.max(0,x);k<d.length;k++)s+=d[k];return s;};
+const tailDown=(d,x)=>{let s=0;for(let k=0;k<=Math.min(x,d.length-1);k++)s+=d[k];return s;};
+function convolve(a,b){const out=new Float64Array(a.length+b.length-1);for(let i=0;i<a.length;i++){const v=a[i];if(!v)continue;for(let j=0;j<b.length;j++)out[i+j]+=v*b[j];}return out;}
+function t1pmf(c,o){const mx=o.hardPity-c,out=new Float64Array(mx+1);let s=1;for(let n=1;n<=mx;n++){const q=puProb(c+n,o);out[n]=s*q;s*=(1-q);}return out;}
+function pullsForPU(k,opt){
+  const o=norm(opt);let d=t1pmf(o.c0,o);const u=t1pmf(0,o);
+  for(let i=1;i<k;i++)d=convolve(d,u);
+  let e=0,e2=0;for(let n=0;n<d.length;n++){e+=n*d[n];e2+=n*n*d[n];}
+  const q=t=>{let a=0;for(let n=0;n<d.length;n++){a+=d[n];if(a>=t)return n;}return d.length-1;};
+  const cdfAt=n=>{let a=0;for(let i=0;i<=Math.min(n,d.length-1);i++)a+=d[i];return a;};
+  /* 確保している長さではなく、確率が正で終わる位置を返す。仮天井のPU率を100%に
+     したときなど、後半が確率0のまま残るので d.length-1 だと最悪値を長く出す */
+  let mx=d.length-1;while(mx>0&&d[mx]<=0)mx--;
+  return{e,sd:Math.sqrt(Math.max(0,e2-e*e)),p50:q(.5),p80:q(.8),p90:q(.9),p99:q(.99),max:mx,cdfAt};
+}
+/* 目標体数への到達時間。生存確率の直和を遷移パスに畳み込んでいる（別パスにすると
+   打ち切り誤差が溜まり、収束判定が効かなくなってループが maxPull まで回る） */
+function hittingTime(opt,target,spec,maxPull=40000){
+  const o=norm(opt);
+  if(target<=0)return{e:0,p50:0,p80:0,p90:0,exact:true,truncated:false};
+  /* 3つの出口で返す形を揃えておく。呼び出し元が exact を見ずに分位点を読んでも
+     undefined が漏れないようにするため */
+  if(target*o.hardPity>26000)return{e:NaN,p50:null,p80:null,p90:null,exact:false,truncated:false};
+  const H=o.hardPity,W=target;
+  const Q=new Float64Array(H),HIT=new Float64Array(H),OTH=new Float64Array(H),ADD=new Int32Array(H);
+  for(let c=0;c<H;c++){const nc=c+1,sp=spec(nc,o);Q[c]=puProb(nc,o);HIT[c]=sp.hit;OTH[c]=1-Q[c]-sp.hit;ADD[c]=sp.onPU;}
+  let cur=new Float64Array(H*W),nxt=new Float64Array(H*W);
+  cur[o.c0*W]=1;
+  let e=0,p50=null,p80=null,p90=null,ended=false,s=1;
+  for(let n=1;n<=maxPull;n++){
+    nxt.fill(0);
+    s=0;
+    for(let c=0;c<H;c++){
+      const base=c*W,nc=c+1,q=Q[c],hit=HIT[c],other=OTH[c],nb=nc*W,add=ADD[c];
+      for(let k=0;k<W;k++){
+        const m=cur[base+k];if(m===0)continue;
+        s+=m;
+        if(q>0){const t=k+add;if(t<W)nxt[t]+=m*q;}
+        if(nc<H){
+          if(hit>0){const t=k+1;if(t<W)nxt[nb+t]+=m*hit;}
+          if(other>0)nxt[nb+k]+=m*other;
+        }
+      }
+    }
+    const t=cur;cur=nxt;nxt=t;
+    e+=s;                      /* s = P(T>n-1) */
+    const cdf=1-s;
+    if(p50===null&&cdf>=.5)p50=n-1;
+    if(p80===null&&cdf>=.8)p80=n-1;
+    if(p90===null&&cdf>=.9)p90=n-1;
+    if(s<1e-13){ended=true;break;}
+  }
+  return{e,p50,p80,p90,exact:true,truncated:!ended};
+}
+function pullsForSpecificFes(opt,maxPull=30000){
+  const o=norm(opt),H=o.hardPity,den=o.r3-o.p;
+  const f1S=o.fesFlat?o.f1:(den>0?(1-o.puAtSoft)*o.f1/den:0);
+  /* 確率0の対象に有限の期待連数を返さない（maxPullがそのまま答えとして出てしまう）。
+     体数0のときも対象が存在しないので到達不能。ここを f1 だけで見ていると、
+     実績タブが期待値0を出している設定で逆引きタブだけが有限の連数を返す */
+  if(!(o.f1>0)||!(o.nf>0))return{e:Infinity,p50:null,p80:null,p90:null,p99:null,atN:0,unreachable:true,truncated:false};
+  let g=new Float64Array(H);g[o.c0]=1;
+  const res={e:0,p50:null,p80:null,p90:null,p99:null,atN:(o.N<=0?0:null),unreachable:false,truncated:false};
+  let prev=1,ended=false;
+  for(let n=1;n<=maxPull;n++){
+    const nx=new Float64Array(H);
+    for(let c=0;c<H;c++){
+      const m=g[c];if(m===0)continue;
+      const nc=c+1;let q,h;
+      if(nc===o.hardPity){q=1;h=0;}
+      else if(nc===o.softPity){q=o.puAtSoft;h=f1S;}
+      else{q=o.p;h=o.f1;}
+      nx[0]+=m*q;
+      if(nc<H)nx[nc]+=m*(1-q-h);
+    }
+    g=nx;
+    let surv=0;for(let c=0;c<H;c++)surv+=g[c];
+    res.e+=prev;
+    const cdf=1-surv;
+    if(res.p50===null&&cdf>=.5)res.p50=n;
+    if(res.p80===null&&cdf>=.8)res.p80=n;
+    if(res.p90===null&&cdf>=.9)res.p90=n;
+    if(res.p99===null&&cdf>=.99)res.p99=n;
+    if(res.atN===null&&n>=o.N)res.atN=cdf;
+    prev=surv;
+    if(surv<1e-13){ended=true;break;}
+  }
+  if(res.atN===null)res.atN=1-prev;
+  res.truncated=!ended;
+  return res;
+}
+
+/* ============ 画面 ============ */
+const $=id=>document.getElementById(id);
+const fx=(v,n=2)=>Number(v).toFixed(n);
+/* v===0 は「小さい」ではなく「起こらない」なので、0.0001%未満とは書かない */
+const pc=v=>v>=0.1?fx(v*100,1)+'%':v>=0.01?fx(v*100,2)+'%':v>=0.0001?fx(v*100,3)+'%':v>0?(v*100).toExponential(1)+'%':'0%';
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function readOpts(){
+  return{
+    N:+$('i-n').value|0, c0:+$('i-c0').value|0,
+    p:+$('i-p').value/100, r3:+$('i-r3').value/100,
+    f1:+$('i-f1').value/100, nf:+$('i-nf').value|0,
+    softPity:+$('i-sp').value|0, puAtSoft:+$('i-spp').value/100,
+    hardPity:+$('i-hp').value|0, fesFlat:$('i-fmode').value==='flat',
+    stone:+$('i-stone').value|0,
+  };
+}
+/* needN=false のときは「回した数」を見ない。逆引きタブはこの値を一切使わないのに、
+   共通の validate を通していたせいで、画面に無い欄のエラーで止まっていた */
+function validate(o,obs,needN){
+  const e=[];
+  if(needN!==false&&!(o.N>=0&&o.N<=4000))e.push('回した数は0〜4000で入れてほしい。');
+  if(!(o.stone>=1))e.push('1連あたりの青輝石は1以上で入れてほしい。');
+  if(!(o.hardPity>=2&&o.hardPity<=999))e.push('本天井の位置は2〜999で入れてほしい。');
+  if(!(o.softPity>=1))e.push('仮天井の位置は1以上で入れてほしい。');
+  if(!(o.hardPity>o.softPity))e.push('本天井は仮天井より後ろにある必要がある。');
+  if(!(o.c0>=0&&o.c0<o.hardPity))e.push('開始チャージは0以上、本天井未満で入れてほしい。');
+  if(!(o.puAtSoft>=0&&o.puAtSoft<=1))e.push('仮天井のPU率は0〜100%で入れてほしい。');
+  if(!(o.f1>=0)||!(o.nf>=0))e.push('フェス限の確率と体数は0以上で入れてほしい。');
+  if(!(o.r3>o.p+o.f1*o.nf-1e-12))e.push('★3合計が「PU＋フェス限の合計」を下回っている。内訳の合計は★3合計を超えられない。');
+  if(o.p<0||o.p>1||o.r3<=0||o.r3>1)e.push('確率の値を確認してほしい。');
+  if(o.fesFlat&&o.puAtSoft+o.f1*o.nf>1+1e-12)e.push('仮天井のPU率とフェス限合計の和が100%を超えている。');
+  if(obs){
+    if(obs.o3>o.N||obs.opu>o.N||obs.ofes>o.N)e.push('実測が回した数を超えている。');
+    if(obs.opu+obs.ofes>obs.o3)e.push('PUとフェス限の合計が★3の合計を超えている。PUもフェス限も★3の内数。');
+    if(o.f1*o.nf<=0&&obs.ofes>0)e.push('フェス限の確率が0%に設定されているのに、実測すり抜けが入っている。設定欄の「フェス限 1体あたり」と「体数」を確認してほしい。');
+  }
+  return e;
+}
+
+/* 分布リボン。実測が分布の外にあっても配列外を読まないようにする */
+function ribbon(d,obs,exp,label){
+  const W=680,H=78,PAD=4,LAST=d.length-1;
+  let lo=0,hi=LAST;
+  while(lo<hi&&d[lo]<1e-5)lo++;
+  while(hi>lo&&d[hi]<1e-5)hi--;
+  const oc=Math.max(0,Math.min(obs,LAST));
+  lo=Math.max(0,Math.min(lo,oc-1));
+  hi=Math.min(LAST,Math.max(hi,oc+1));
+  const n=hi-lo+1,bw=(W-PAD*2)/n;
+  let mx=0;for(let k=lo;k<=hi;k++)mx=Math.max(mx,d[k]);
+  if(!(mx>0))mx=1;
+  const x=k=>PAD+(k-lo)*bw;
+  let bars='';
+  for(let k=lo;k<=hi;k++){
+    const h=Math.max(0.6,(d[k]/mx)*(H-30));
+    const hot=k>=oc;
+    bars+=`<rect x="${fx(x(k)+bw*0.08,2)}" y="${fx(H-16-h,2)}" width="${fx(bw*0.84,2)}" height="${fx(h,2)}" fill="${hot?'var(--halo)':'#cfe3f2'}" opacity="${hot?0.95:0.85}"/>`;
+  }
+  const ec=Math.max(lo,Math.min(exp,hi));
+  const ex=x(ec)+bw/2, ox=x(oc)+bw/2;
+  return `<svg class="ribbon" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(label)}の分布。期待値${fx(exp,2)}に対し実測${obs}。">
+    ${bars}
+    <line x1="${fx(ex,2)}" y1="8" x2="${fx(ex,2)}" y2="${H-16}" stroke="var(--slate)" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="${fx(ox,2)}" y1="4" x2="${fx(ox,2)}" y2="${H-16}" stroke="var(--bloom)" stroke-width="2.5"/>
+    <line x1="0" y1="${H-16}" x2="${W}" y2="${H-16}" stroke="var(--line)" stroke-width="1"/>
+    <text x="${PAD}" y="${H-4}" font-size="10" fill="#5a7391" font-family="ui-monospace,monospace">${lo}</text>
+    <text x="${W-PAD}" y="${H-4}" font-size="10" fill="#5a7391" text-anchor="end" font-family="ui-monospace,monospace">${hi}</text>
+  </svg>`;
+}
+
+function verdict(up,down){
+  if(up<=0.01)return['hot','大上振れ 上位'+pc(up)];
+  if(up<=0.10)return['hot','上振れ 上位'+pc(up)];
+  if(up<=0.35)return['','やや上 上位'+pc(up)];
+  if(down<=0.01)return['cold','大下振れ 下位'+pc(down)];
+  if(down<=0.10)return['cold','下振れ 下位'+pc(down)];
+  if(down<=0.35)return['cold','やや下 下位'+pc(down)];
+  return['','ほぼ期待どおり'];
+}
+
+function metricBlock(name,s,obs,naive,note){
+  const LAST=s.dist.length-1, over=obs>LAST;
+  const up=tailUp(s.dist,obs),down=tailDown(s.dist,obs);
+  const [cls,txt]=over?['bad','計算範囲外']:verdict(up,down);
+  const sig=s.sd>0?(obs-s.e)/s.sd:0;
+  return `<div class="metric">
+    <div class="mhead"><div class="mname">${esc(name)}</div><div class="mverdict ${cls}">${esc(txt)}</div></div>
+    <div class="mnums">
+      <div><span>期待値</span><b>${fx(s.e,2)}</b></div>
+      <div><span>標準偏差</span><b>${fx(s.sd,2)}</b></div>
+      <div><span>実測</span><b class="big">${obs}</b></div>
+      <div><span>差</span><b>${sig>=0?'+':''}${fx(obs-s.e,2)}</b></div>
+      <div><span>偏差</span><b>${sig>=0?'+':''}${fx(sig,2)}σ</b></div>
+      <div><span>これ以上出る確率</span><b>${over?'—':pc(up)}</b></div>
+      <div><span>これ以下で済む確率</span><b>${over?'—':pc(down)}</b></div>
+    </div>
+    ${ribbon(s.dist,obs,s.e,name)}
+    ${over?`<p class="note alert">実測 ${obs} は分布の計算範囲（0〜${LAST}）の外にある。ここまでの上振れは事実上ありえないので、入力の取り違えを疑ってほしい。上の確率と判定は意味を持たない。</p>`:''}
+    <p class="note">${note?esc(note)+' ':''}表示確率だけで素朴に計算すると ${fx(naive,2)}。天井を含めた本当の期待値は ${fx(s.e,2)}。<b style="color:var(--void)">桃色の線があなたの位置</b>、点線が期待値。</p>
+  </div>`;
+}
+
+/* 到達に必要な期待連数。既定は天井を織り込んだ厳密解で、厳密解が使えないときだけ
+   実効レート換算に落として ※近似 と明示する。
+   落とす条件は3つ：
+   (1) 目標体数が大きく DP の格子が張れない（hittingTime の 26000 ガード）
+   (2) 天井が保証しない対象（フェス限）で、到達時間が maxPull に収まらない見込み
+   (3) それでも打ち切られた場合の保険
+   (2) を先に判定するのは、DP を回してから打ち切りに気づくと 4万回ぶんの計算が
+   無駄になるうえ、打ち切った途中和が「厳密解の顔をした過小値」として出るため */
+function pullsFor(target,expAtN,N,o,spec){
+  const rate=expAtN>0?N*target/expAtN:Infinity;
+  if(!(rate<=30000))return{n:rate,p50:null,p90:null,exact:false};
+  const h=hittingTime(o,target,spec);
+  if(h.exact&&!h.truncated)return{n:h.e,p50:h.p50,p90:h.p90,exact:true};
+  return{n:rate,p50:null,p90:null,exact:false};
+}
+
+let lastCopy='';
+function runA(){
+  const o=readOpts();
+  const obs={o3:+$('i-o3').value|0,opu:+$('i-opu').value|0,ofes:+$('i-ofes').value|0};
+  const errs=validate(o,obs);
+  const box=$('err-a');
+  if(errs.length){box.hidden=false;box.innerHTML=errs.map(esc).join('<br>');$('out-a').innerHTML='';return;}
+  box.hidden=true;
+  const r=analyze(o);
+  if(r.tooHeavy){
+    box.hidden=false;
+    box.innerHTML='この設定は計算量が大きすぎて、ブラウザが数分止まる。本天井の位置か PU 1体の確率を下げるか、回した数を減らしてほしい。';
+    $('out-a').innerHTML='';return;
+  }
+  const stone=o.stone;
+  const nonPU3=o.r3-o.p, fTot=r.f, fSoft=r.fSoftAbs;
+  const specs={
+    s3:nc=>nc===o.hardPity?{onPU:1,hit:0}:nc===o.softPity?{onPU:1,hit:1-o.puAtSoft}:{onPU:1,hit:nonPU3},
+    pu:()=>({onPU:1,hit:0}),
+    fes:nc=>nc===o.hardPity?{onPU:0,hit:0}:nc===o.softPity?{onPU:0,hit:fSoft}:{onPU:0,hit:fTot},
+  };
+  let approxUsed=false,zeroUsed=false,overUsed=false;
+  const rows=[
+    ['★3の合計',obs.o3,r.star3,specs.s3],
+    ['PU',obs.opu,r.pu,specs.pu],
+    ['フェス限すり抜け',obs.ofes,r.fes,specs.fes],
+  ].map(([n,ob,st,sp])=>{
+    /* 上で「計算範囲外・判定は意味を持たない」と出した対象は、ここでも計算しない。
+       同じ画面で否定した数値を根拠に石換算を並べることになるうえ、
+       打ち間違いのために数秒の停止を払うことになる */
+    if(ob>st.dist.length-1){
+      overUsed=true;
+      return `<tr><td>${esc(n)}を${ob}体</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`;
+    }
+    if(ob<=0){
+      zeroUsed=true;
+      return `<tr><td>${esc(n)}を0体</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`;
+    }
+    const h=pullsFor(ob,st.e,o.N,o,sp);
+    if(!h.exact)approxUsed=true;
+    const need=h.n, diff=need-o.N;
+    return `<tr><td>${esc(n)}を${ob}体${h.exact?'':' ※近似'}</td><td class="num">${isFinite(need)?fx(need,1):'—'}連</td><td class="num">${h.p50!==null?h.p50+'連':'—'}</td><td class="num">${isFinite(diff)?(diff>=0?'+':'−')+fx(Math.abs(diff),1):'—'}連</td><td class="num">${isFinite(diff)?(diff>=0?'+':'−')+Math.abs(Math.round(diff*stone)).toLocaleString():'—'}石</td></tr>`;
+  }).join('');
+
+  const puPity=r.pu.e-r.puNaive;
+  const pitySh=r.pu.e>0?Math.max(0,Math.min(1,puPity/r.pu.e)):0;
+  const html=`
+  <div class="card">
+    <div class="eyebrow"><span>Result</span></div>
+    <h2>天井込みの分布から見た位置</h2>
+    ${metricBlock('★3の合計',r.star3,obs.o3,r.star3Naive,'')}
+    ${metricBlock('PU',r.pu,obs.opu,r.puNaive,'')}
+    ${metricBlock('フェス限すり抜け',r.fes,obs.ofes,r.fesNaive,'')}
+  </div>
+
+  <div class="card tight">
+    <h3>PU期待値のうち、天井が作っている分</h3>
+    <div class="stack">
+      <i style="width:${fx(100*(1-pitySh),2)}%;background:#cfe3f2"></i>
+      <i style="width:${fx(100*pitySh,2)}%;background:var(--halo)"></i>
+    </div>
+    <div class="legend">
+      <span><i style="background:#cfe3f2"></i>素引き ${fx(r.puNaive,2)}体</span>
+      <span><i style="background:var(--halo)"></i>天井の上乗せ ${fx(Math.max(0,puPity),2)}体（${pc(pitySh)}）</span>
+    </div>
+    <p class="note">${o.N}連の中で仮天井が平均${fx(r.eSoft,2)}回、本天井が平均${fx(r.eHard,2)}回発火する。この上乗せがあるので、実測PU率を表示確率と直接比べると運を過大評価する。</p>
+  </div>
+
+  <div class="card tight">
+    <h3>実効レート換算：何連ぶん得したか</h3>
+    <table><thead><tr><th>到達した内容</th><th class="num">必要な期待連数</th><th class="num">半分の人</th><th class="num">浮いた連数</th><th class="num">石換算</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="note">プラスが得。「半分の人」はその連数までに同じ体数へ届く人が50%という意味。同じ${o.N}連の中で重なって起きているので、3行を足し算することはできない。${zeroUsed?'0体の行は「必要連数0連」となり比較が成り立たないので伏せてある。':''}${overUsed?'計算範囲外と判定した対象は、上で意味を持たないと書いた値をここで使い回さないよう伏せてある。':''}${approxUsed?'※近似の行は厳密解が使えないため実効レート換算（この'+o.N+'連で得た平均から比例で伸ばす）に落としている。ズレの向きと大きさは回した数と開始チャージに依存し、回した数が目標体数に対して小さいほど、開始チャージが大きいほど大きくなる。実測では0.1%未満から数%の幅。':''}</p>
+  </div>
+
+  <div class="card tight">
+    <h3>Xに貼る用のテキスト</h3>
+    <textarea id="copytext" readonly></textarea>
+    <div style="margin-top:8px"><button type="button" id="copybtn">テキストをコピー</button></div>
+  </div>`;
+  $('out-a').innerHTML=html;
+
+  const up3=tailUp(r.star3.dist,obs.o3),upP=tailUp(r.pu.dist,obs.opu),upF=tailUp(r.fes.dist,obs.ofes);
+  const uv=(d,x,v)=>x>d.length-1?'範囲外':'上位'+pc(v);
+  lastCopy=
+`${o.N}連の結果を天井込みの分布で判定
+─────────────
+★3    期待${fx(r.star3.e,2)} → 実測${obs.o3}（${uv(r.star3.dist,obs.o3,up3)}／${((obs.o3-r.star3.e)/r.star3.sd>=0?'+':'')}${fx((obs.o3-r.star3.e)/r.star3.sd,2)}σ）
+PU    期待${fx(r.pu.e,2)} → 実測${obs.opu}（${uv(r.pu.dist,obs.opu,upP)}）
+フェス限 期待${fx(r.fes.e,2)} → 実測${obs.ofes}（${uv(r.fes.dist,obs.ofes,upF)}）
+─────────────
+PU期待値の${pc(pitySh)}は天井が作っている分。
+表示確率とそのまま比べると運を読み違える。
+設定：★3 ${fx(o.r3*100,1)}% / PU ${fx(o.p*100,1)}% / フェス限 ${fx(o.f1*100,2)}%×${o.nf}体 / 開始チャージ${o.c0}`;
+  $('copytext').value=lastCopy;
+  $('copybtn').addEventListener('click',()=>{
+    const t=$('copytext');t.select();
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(lastCopy).then(
+        ()=>{$('copybtn').textContent='コピーした';setTimeout(()=>$('copybtn').textContent='テキストをコピー',1600);},
+        ()=>{try{document.execCommand('copy');}catch(e){}}
+      );
+    }else{try{document.execCommand('copy');}catch(e){}}
+  });
+}
+
+function runB(){
+  const o=readOpts();
+  /* このタブは「回した数」を一切使わないので検証対象から外す。
+     画面に無い欄のエラーで止まると、何を直せばいいか分からない */
+  const errs=validate(o,null,false);
+  const box=$('err-b');
+  if(errs.length){box.hidden=false;box.innerHTML=errs.map(esc).join('<br>');$('out-b').innerHTML='';return;}
+  box.hidden=true;
+  const k=Math.max(1,Math.min(20,+$('i-k').value|0));
+  const budget=Math.max(0,Math.min(4000,+$('i-budget').value|0));
+  const stone=o.stone;
+  const st=n=>isFinite(n)?Math.round(n*stone).toLocaleString()+'石':'—';
+
+  const row=(i,hl)=>{const q=pullsForPU(i,o);
+    return `<tr${hl?' style="background:var(--halo-wash);font-weight:700"':''}><td>PU ${i}体</td><td class="num">${fx(q.e,1)}</td><td class="num">${q.p50}</td><td class="num">${q.p80}</td><td class="num">${q.p90}</td><td class="num">${q.max}</td></tr>`;};
+  const top=Math.min(10,Math.max(k,5));
+  const puRows=[];
+  for(let i=1;i<=top;i++)puRows.push(row(i,i===k));
+  if(k>top)puRows.push(row(k,true));   /* 11体以上を指定したとき、その行が表から消えないように */
+  const kq=pullsForPU(k,o);
+  const fs=pullsForSpecificFes(Object.assign({},o,{N:budget}));
+  const inf=v=>v===null?'到達せず':v.toLocaleString()+'連';
+
+  $('out-b').innerHTML=`
+  <div class="card">
+    <div class="eyebrow"><span>PU</span></div>
+    <h2>PUを狙うとき</h2>
+    <div class="mnums" style="margin-bottom:10px">
+      <div><span>PU${k}体の期待連数</span><b class="big">${fx(kq.e,1)}連</b></div>
+      <div><span>ばらつき</span><b>±${fx(kq.sd,1)}連</b></div>
+      <div><span>石換算</span><b>${st(kq.e)}</b></div>
+      <div><span>${budget}連で届く確率</span><b>${pc(kq.cdfAt(budget))}</b></div>
+    </div>
+    <table><thead><tr><th>目標</th><th class="num">期待</th><th class="num">半分の人</th><th class="num">8割の人</th><th class="num">9割の人</th><th class="num">最悪でも</th></tr></thead>
+    <tbody>${puRows.join('')}</tbody></table>
+    <p class="note">「半分の人」はその連数までに達成できる人が50%という意味。天井があるので最悪値が確定しているのがPUの強みで、${o.puAtSoft>=1?o.softPity+'連（仮天井のPU率を100%にしているので、本天井まで行かずに確定する）':o.hardPity+'連'}ごとに必ず1体は増える。期待値だけ見て予算を組むと半分の人が足りなくなるので、8割の列を基準にするほうが実務的。</p>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow"><span>Fes-limited</span></div>
+    <h2>特定のフェス限すり抜けを1体狙うとき</h2>
+    ${fs.unreachable?`<p class="note alert">${o.nf>0?'フェス限の1体あたり確率が0%に設定されている':'フェス限の体数が0体に設定されている'}ので、この対象は何連回しても出ない。設定欄の「フェス限 1体あたり」と「フェス限の体数」を入れ直してほしい。</p>`:`
+    <div class="mnums" style="margin-bottom:10px">
+      <div><span>期待連数</span><b class="big">${isFinite(fs.e)?fx(fs.e,0)+'連':'—'}</b></div>
+      <div><span>石換算</span><b>${st(fs.e)}</b></div>
+      <div><span>${budget}連で1体以上出る確率</span><b>${pc(fs.atN)}</b></div>
+    </div>
+    <table><thead><tr><th>達成率</th><th class="num">必要連数</th><th class="num">石換算</th></tr></thead><tbody>
+      <tr><td>半分の人が届く</td><td class="num">${inf(fs.p50)}</td><td class="num">${fs.p50?st(fs.p50):'—'}</td></tr>
+      <tr><td>8割の人が届く</td><td class="num">${inf(fs.p80)}</td><td class="num">${fs.p80?st(fs.p80):'—'}</td></tr>
+      <tr><td>9割の人が届く</td><td class="num">${inf(fs.p90)}</td><td class="num">${fs.p90?st(fs.p90):'—'}</td></tr>
+      <tr><td>99%の人が届く</td><td class="num">${inf(fs.p99)}</td><td class="num">${fs.p99?st(fs.p99):'—'}</td></tr>
+    </tbody></table>
+    ${fs.truncated?`<p class="note alert">確率が低すぎて30,000連まで計算しても収束しなかった。期待連数はこの値より大きい。</p>`:''}`}
+    <p class="note">フェス限のすり抜けは天井が一切保証してくれない。上限のない裸の確率なので、PUと違って「回せば必ず来る」が成立しない。狙って取りに行く対象ではなく、PUを追う過程の副産物として扱うのが妥当。</p>
+  </div>`;
+}
+
+/* タブ */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',String(x===t)));
+    document.querySelectorAll('.panel').forEach(p=>{p.hidden=(p.id!=='panel-'+t.id.split('-')[1]);});
+  });
+});
+/* プリセット。押した記録ではなく、いま入っている値と突き合わせて選択状態を決める。
+   設定欄を手で書き換えたときに、選ばれていないプリセットが光り続けるのを避けるため */
+const PRESETS={
+  fes:   {r3:6, p:0.7, f1:0.1, nf:9},
+  normal:{r3:3, p:0.7, f1:0,   nf:0},
+};
+const PFIELD={r3:'i-r3',p:'i-p',f1:'i-f1',nf:'i-nf'};
+/* プリセットが触るのは確率4項目だけだが、点灯判定は天井まわりも見る。
+   ここを確率だけで判定していたので、仮天井や本天井を書き換えても
+   プリセットが選択状態のまま残り、カスタム設定の表示も出なかった */
+const STRUCT={'i-sp':'100','i-spp':'50','i-hp':'200','i-fmode':'flat'};
+const structDefault=()=>{for(const id in STRUCT)if($(id).value!==STRUCT[id])return false;return true;};
+function syncPresets(){
+  let hit=null;
+  if(structDefault()){
+    for(const k in PRESETS){
+      const s=PRESETS[k];let same=true;
+      for(const f in PFIELD){if(Math.abs((+$(PFIELD[f]).value)-s[f])>1e-9){same=false;break;}}
+      if(same){hit=k;break;}
+    }
+  }
+  document.querySelectorAll('[data-preset]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.preset===hit)));
+  $('preset-state').textContent=hit?'':'カスタム設定';
+}
+document.querySelectorAll('[data-preset]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const s=PRESETS[b.dataset.preset];if(!s)return;
+    for(const f in PFIELD)$(PFIELD[f]).value=String(s[f]);
+    syncPresets();
+  });
+});
+for(const f in PFIELD)$(PFIELD[f]).addEventListener('input',syncPresets);
+for(const id in STRUCT)$(id).addEventListener($(id).tagName==='SELECT'?'change':'input',syncPresets);
+syncPresets();
+/* 開始チャージの上限を本天井に追従させる */
+$('i-hp').addEventListener('input',()=>{
+  const h=+$('i-hp').value|0;
+  if(h>=2)$('i-c0').max=String(h-1);
+});
+/* 実行（重い計算の前に一度描画を返す） */
+function guard(btn,fn,errId){
+  const base=btn.textContent;
+  btn.addEventListener('click',()=>{
+    /* 待ち時間は およそ 回した数×本天井 に比例する。二段で告知する */
+    const load=(+$('i-n').value|0)*(+$('i-hp').value|0);
+    btn.disabled=true;
+    btn.textContent=load>=1e6?'計算中…（十秒以上かかることがある）':(load>=1.5e5?'計算中…（数秒かかる）':'計算中…');
+    document.body.classList.add('busy');
+    setTimeout(()=>{
+      /* 握りつぶすと、失敗したことに気づかないまま前回の結果を読み続けることになる。
+         画面に出して、その回の出力を消す */
+      try{fn();}
+      catch(e){
+        console.error(e);
+        const box=$(errId);box.hidden=false;
+        box.textContent='計算中にエラーが起きた。設定を既定に戻すか、回した数を小さくして試してほしい。詳細はブラウザのコンソールに出ている。';
+        $(errId==='err-a'?'out-a':'out-b').innerHTML='';
+      }
+      btn.disabled=false;document.body.classList.remove('busy');
+      btn.textContent=base;
+    },20);
+  });
+}
+guard($('go-a'),runA,'err-a');
+guard($('go-b'),runB,'err-b');
+runA();
+</script>
+</body>
+</html>
